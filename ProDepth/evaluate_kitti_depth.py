@@ -116,8 +116,8 @@ def evaluate(opt):
         multi_encoder_class = networks.ResnetEncoderMatching
 
 
-        mono_encoder_dict = torch.load(mono_encoder_path)
-        multi_encoder_dict = torch.load(multi_encoder_path)
+        mono_encoder_dict = torch.load(mono_encoder_path, map_location=torch.device('cpu'), weights_only=False)
+        multi_encoder_dict = torch.load(multi_encoder_path, map_location=torch.device('cpu'), weights_only=False)
 
 
         try:
@@ -162,8 +162,8 @@ def evaluate(opt):
                             depth_binning=opt.depth_binning,
                             num_depth_bins=opt.num_depth_bins)
         
-        pose_enc_dict = torch.load(os.path.join(opt.load_weights_folder, "pose_encoder.pth"))
-        pose_dec_dict = torch.load(os.path.join(opt.load_weights_folder, "pose.pth"))
+        pose_enc_dict = torch.load(os.path.join(opt.load_weights_folder, "pose_encoder.pth"), map_location=torch.device('cpu'), weights_only=False)
+        pose_dec_dict = torch.load(os.path.join(opt.load_weights_folder, "pose.pth"), map_location=torch.device('cpu'), weights_only=False)
 
         pose_enc = networks.ResnetEncoder(18, False, num_input_images=2)
         pose_dec = networks.PoseDecoder(pose_enc.num_ch_enc, num_input_features=1,
@@ -179,8 +179,8 @@ def evaluate(opt):
         pose_dec.eval()
 
         if torch.cuda.is_available():
-            pose_enc.cuda()
-            pose_dec.cuda()
+            pose_enc.cpu()
+            pose_dec.cpu()
 
         multi_encoder = multi_encoder_class(**multi_encoder_opts)
         mono_encoder = mono_encoder_class(**mono_encoder_opts)
@@ -191,12 +191,12 @@ def evaluate(opt):
 
         multi_model_dict = multi_encoder.state_dict()
         multi_encoder.load_state_dict({k: v for k, v in multi_encoder_dict.items() if k in multi_model_dict})
-        multi_depth_decoder.load_state_dict(torch.load(multi_decoder_path))
+        multi_depth_decoder.load_state_dict(torch.load(multi_decoder_path, map_location=torch.device('cpu'), weights_only=False))
 
         mono_model_dict = mono_encoder.state_dict()
         mono_encoder.load_state_dict({k: v for k, v in mono_encoder_dict.items() if k in mono_model_dict})
-        mono_depth_decoder.load_state_dict(torch.load(mono_decoder_path))
-        mono_depth_uncert_decoder.load_state_dict(torch.load(mono_decoder_uncert_path))
+        mono_depth_decoder.load_state_dict(torch.load(mono_decoder_path, map_location=torch.device('cpu'), weights_only=False))
+        mono_depth_uncert_decoder.load_state_dict(torch.load(mono_decoder_uncert_path, map_location=torch.device('cpu'), weights_only=False))
 
         multi_encoder.eval()
         multi_depth_decoder.eval()
@@ -208,12 +208,12 @@ def evaluate(opt):
 
 
         if torch.cuda.is_available():
-            multi_encoder.cuda()
-            multi_depth_decoder.cuda()
+            multi_encoder.cpu()
+            multi_depth_decoder.cpu()
         
-            mono_encoder.cuda()
-            mono_depth_decoder.cuda()
-            mono_depth_uncert_decoder.cuda()
+            mono_encoder.cpu()
+            mono_depth_decoder.cpu()
+            mono_depth_uncert_decoder.cpu()
 
         multi_pred_disps = []
 
@@ -225,7 +225,7 @@ def evaluate(opt):
             for i, data in tqdm.tqdm(enumerate(dataloader)):
                 input_color = data[('color', 0, 0)]
                 if torch.cuda.is_available():
-                    input_color = input_color.cuda()
+                    input_color = input_color.cpu()
 
                 mono_feat = mono_encoder(input_color)
                 mono_output = mono_depth_decoder(mono_feat)
@@ -242,7 +242,7 @@ def evaluate(opt):
                 # predict poses
                 pose_feats = {f_i: data["color", f_i, 0] for f_i in frames_to_load}
                 if torch.cuda.is_available():
-                    pose_feats = {k: v.cuda() for k, v in pose_feats.items()}
+                    pose_feats = {k: v.cpu() for k, v in pose_feats.items()}
                 # compute pose from 0->-1, -1->-2, -2->-3 etc and multiply to find 0->-3
                 for fi in frames_to_load[1:]:
                     if fi < 0:
@@ -279,10 +279,10 @@ def evaluate(opt):
                 invK = data[('inv_K', 2)]
 
                 if torch.cuda.is_available():
-                    lookup_frames = lookup_frames.cuda()
-                    relative_poses = relative_poses.cuda()
-                    K = K.cuda()
-                    invK = invK.cuda()
+                    lookup_frames = lookup_frames.cpu()
+                    relative_poses = relative_poses.cpu()
+                    K = K.cpu()
+                    invK = invK.cpu()
 
                 if opt.zero_cost_volume:
                     relative_poses *= 0

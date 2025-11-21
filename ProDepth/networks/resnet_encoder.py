@@ -183,7 +183,7 @@ class ResnetEncoderMatching(nn.Module):
             self.warp_depths.append(depth)
         self.warp_depths = torch.stack(self.warp_depths, 0).float()
         if self.is_cuda:
-            self.warp_depths = self.warp_depths.cuda()
+            self.warp_depths = self.warp_depths.cpu()
 
     def match_features(self, current_feats, lookup_feats, relative_poses, K, invK):
         """Compute a cost volume based on L1 difference between current_feats and lookup_feats.
@@ -382,7 +382,7 @@ class ResnetEncoderMatching(nn.Module):
         mono_output = F.interpolate(mono_disp.detach(), [mono_disp.shape[-2] // 4, mono_disp.shape[-1] // 4], mode="bilinear")
         _mono_disp, _mono_depth = disp_to_depth(mono_output,0.1, 100)
         
-        d_i = self.depth_bins.view(1, -1, 1, 1).repeat(_mono_depth.shape[0],1,_mono_depth.shape[-2],_mono_depth.shape[-1]).cuda()
+        d_i = self.depth_bins.view(1, -1, 1, 1).repeat(_mono_depth.shape[0],1,_mono_depth.shape[-2],_mono_depth.shape[-1]).cpu()
 
         sigma = F.interpolate(var.detach(), [mono_disp.shape[-2] // 4, mono_disp.shape[-1] // 4], mode="bilinear") 
         gaussian_mono_distribution = (1 / (sigma * math.sqrt(2 * math.pi))) * torch.exp(-((d_i - _mono_depth) ** 2) / (2 * sigma ** 2))
@@ -445,12 +445,12 @@ class ResnetEncoderMatching(nn.Module):
         return self.features, lowest_cost, confidence_mask, self.cv_features, binary_mask, refined_lowest_cost, gaussian_cost
             
     def cuda(self):
-        super().cuda()
-        self.backprojector.cuda()
-        self.projector.cuda()
+        super().cpu()
+        self.backprojector.cpu()
+        self.projector.cpu()
         self.is_cuda = True
         if self.warp_depths is not None:
-            self.warp_depths = self.warp_depths.cuda()
+            self.warp_depths = self.warp_depths.cpu()
 
     def cpu(self):
         super().cpu()
@@ -464,23 +464,23 @@ class ResnetEncoderMatching(nn.Module):
         if str(device) == 'cpu':
             self.cpu()
         elif str(device) == 'cuda':
-            self.cuda()
+            self.cpu()
         else:
             raise NotImplementedError
         
     def load_pretrain(self):
-        path = os.path.expanduser("<PATH TO lite-mono-8m-pretrain.pth>")
+        path = os.path.expanduser("~/cs/bfr/ProDepth/pretrained/lite-mono-8m-pretrain.pth")
         model_dict = self.lite_encoder.state_dict()
-        pretrained_dict = torch.load(path)['model']
+        pretrained_dict = torch.load(path, map_location=torch.device('cpu'), weights_only=False)['model']
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if (k in model_dict and not k.startswith('norm'))}
         model_dict.update(pretrained_dict)
         self.lite_encoder.load_state_dict(model_dict)
         print('MULTI ENCODER loaded.')
 
     def load_cv_pretrain(self):
-        path = os.path.expanduser("<PATH TO lite-mono-8m-pretrain.pth>")
+        path = os.path.expanduser("~/cs/bfr/ProDepth/pretrained/lite-mono-8m-pretrain.pth")
         model_dict = self.cv_encoder.state_dict()
-        pretrained_dict = torch.load(path)['model']
+        pretrained_dict = torch.load(path, map_location=torch.device('cpu'), weights_only=False)['model']
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if (k in model_dict and not k.startswith('norm'))}
         model_dict.update(pretrained_dict)
         self.cv_encoder.load_state_dict(model_dict)
